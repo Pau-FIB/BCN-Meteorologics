@@ -1,55 +1,102 @@
-import os, re, json
-from urllib.request import urlopen, Request
-from urllib.parse import urlencode
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Descarga exactamente los CSV del anio 2025 a partir de enlaces de API CKAN.
+Salida: ./bcn_meteo_csv
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import shutil
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse, urlencode
+from urllib.request import Request, urlopen
+
 
 ACTION_ROOT = "https://opendata-ajuntament.barcelona.cat/data/api/action"
-DATASET_ID  = "mesures-estacions-meteorologiques"
-BASE_YEAR   = 2023          # condición: año > BASE_YEAR
-OUT_DIR     = "bcn_meteo_csv"
+OUT_DIR = Path(__file__).resolve().parent / "bcn_meteo_csv"
+YEAR = "2025"
 
-os.makedirs(OUT_DIR, exist_ok=True)
+# Sustituye o amplia esta lista con tus 3 enlaces de API.
+API_LINKS = [
+	"https://opendata-ajuntament.barcelona.cat/data/api/action/datastore_search?resource_id=8e7388ee-ffbd-446e-a8ad-c427a99da48d&limit=5",
+	"https://opendata-ajuntament.barcelona.cat/data/api/action/datastore_search?resource_id=066d46b1-25be-4f08-b0e0-5a233714bda2&limit=5",
+	"https://opendata-ajuntament.barcelona.cat/data/api/action/datastore_search?resource_id=00904de2-8660-4c41-92e3-66e7c87265be&limit=5",
+]
 
-def ckan(action, **params):
-    url = f"{ACTION_ROOT}/{action}?{urlencode(params)}"
-    with urlopen(url) as r:
-        data = json.load(r)
-    if not data.get("success"):
-        raise RuntimeError(data)
-    return data["result"]
 
-def best_year(text):
-    years = [int(y) for y in re.findall(r"(?:19|20)\d{2}", text)]
-    return max(years) if years else None
+def safe_filename(name: str) -> str:
+	return re.sub(r"[^\w\-.]+", "_", name.strip())
 
-def download(url, path):
-    req = Request(url, headers={"User-Agent": "bcn-opendata-csv-downloader/1.0"})
-    with urlopen(req) as r, open(path, "wb") as f:
-        while True:
-            chunk = r.read(1024 * 1024)
-            if not chunk:
-                break
-            f.write(chunk)
 
-pkg = ckan("package_show", id=DATASET_ID)
+def extract_resource_id(api_link: str) -> str:
+	parsed = urlparse(api_link)
+	qs = parse_qs(parsed.query)
+	rid = (qs.get("resource_id") or [""])[0].strip()
+	if not rid:
+		raise ValueError(f"No se encontro resource_id en: {api_link}")
+	return rid
 
-n = 0
-for res in pkg.get("resources", []):
-    name = res.get("name") or res.get("title") or ""
-    url  = res.get("url") or ""
-    fmt  = (res.get("format") or "").lower()
 
-    if not (("csv" in fmt) or url.lower().endswith(".csv")):
-        continue
+def ckan_resource_show(resource_id: str) -> dict:
+	url = f"{ACTION_ROOT}/resource_show?{urlencode({'id': resource_id})}"
+	req = Request(url, headers={"User-Agent": "bcn-meteorologics/1.0", "Accept": "application/json"})
+	with urlopen(req, timeout=60) as resp:
+		payload = json.loads(resp.read().decode("utf-8"))
+	if not payload.get("success"):
+		raise RuntimeError(f"resource_show fallo para {resource_id}: {payload}")
+	return payload["result"]
 
-    y = best_year(f"{name} {url}")
-    if not (y and y >= BASE_YEAR):
-        continue
 
-    fname = re.sub(r"[^\w\-.]+", "_", (name or res["id"]))[:180] + ".csv"
-    path = os.path.join(OUT_DIR, fname)
+def is_target_2025_csv(resource: dict) -> bool:
+	name = str(resource.get("name") or "")
+	fmt = str(resource.get("format") or "")
+	url = str(resource.get("url") or "")
+	text = f"{name} {url}".lower()
+	return YEAR in text and "csv" in fmt.lower()
 
-    print(f"Downloading ({y}): {name} -> {path}")
-    download(url, path)
-    n += 1
 
-print(f"Done. CSV downloaded: {n} in ./{OUT_DIR}")
+def download_csv(url: str, out_path: Path) -> None:
+	req = Request(url, headers={"User-Agent": "bcn-meteorologics/1.0"})
+	with urlopen(req, timeout=120) as src, out_path.open("wb") as dst:
+		shutil.copyfileobj(src, dst)
+
+
+def main() -> int:
+	OUT_DIR.mkdir(parents=True, exist_ok=True)
+	downloaded = 0
+
+	for idx, link in enumerate(API_LINKS, start=1):
+		try:
+			rid = extract_resource_id(link)
+			resource = ckan_resource_show(rid)
+			if not is_target_2025_csv(resource):
+				print(f"[{idx}] Omitido (no es CSV {YEAR}): {rid}")
+				continue
+
+			name = str(resource.get("name") or f"{rid}.csv")
+			filename = safe_filename(name)
+			if not filename.lower().endswith(".csv"):
+				filename += ".csv"
+
+			url = str(resource.get("url") or "").strip()
+			if not url:
+				print(f"[{idx}] Omitido (sin URL de descarga): {rid}")
+				continue
+
+			out_path = OUT_DIR / filename
+			print(f"[{idx}] Descargando: {filename}")
+			download_csv(url, out_path)
+			downloaded += 1
+		except Exception as exc:
+			print(f"[{idx}] Error: {exc}")
+
+	print(f"Completado. CSV {YEAR} descargados: {downloaded}. Carpeta: {OUT_DIR}")
+	return 0 if downloaded else 1
+
+
+if __name__ == "__main__":
+	raise SystemExit(main())

@@ -59,7 +59,7 @@ for file in os.listdir(raw_path):
 
         output_path = os.path.join(formatted_path, table_name)
 
-        df.write.mode("overwrite").parquet(output_path)
+        df.write.mode("overwrite").parquet(output_path, compression="snappy")# comprime los archivos parquet con snappy para ahorrar espacio sin perder rendimiento en las consultas.
 
 
 # -------------------------

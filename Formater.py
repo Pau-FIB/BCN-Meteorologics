@@ -1,4 +1,3 @@
-
 #wget -O "duckdb.jar" "https://repo1.maven.org/maven2/org/duckdb/duckdb_jdbc/0.10.1/duckdb_jdbc-0.10.1.jar"
 from pyspark.sql import SparkSession
 import os
@@ -39,7 +38,6 @@ for file in os.listdir(raw_path):
 
         table_name = clean_table_name(file)
 
-        #  escribir en DuckDB usando JDBC (como en clase)
         df.write \
           .format("jdbc") \
           .option("url", "jdbc:duckdb:formatted_zone.duckdb") \

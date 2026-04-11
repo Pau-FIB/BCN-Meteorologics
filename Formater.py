@@ -153,7 +153,7 @@ archivos = [
 
 for ruta in archivos:
     # 1. Leer
-    df = spark.read.option("delimiter", ",").option("header", True).csv(ruta)
+    df = spark.read.option("delimiter", ",").option("header", True).option("inferSchema", True).csv(ruta)
     
     # 2. Limpiar columnas: Aplicamos clean_column a cada nombre
     new_columns = [clean_column(c) for c in df.columns]

@@ -133,14 +133,14 @@ def clean_column(col):
 
 # ── Configuración inicial ──────────────────────────────────────────────────
 
-conn = duckdb.connect("bcn_meteo.db")
+conn = duckdb.connect("formatted_zone.db")
 conn.close()
 
 spark = SparkSession.builder \
     .config("spark.jars", "duckdb.jar") \
     .getOrCreate()
 
-JDBC_URL = "jdbc:duckdb:bcn_meteo.db"
+JDBC_URL = "jdbc:duckdb:formatted_zone.db"
 DRIVER   = "org.duckdb.DuckDBDriver"
 
 # ── Procesamiento de archivos ──────────────────────────────────────────────

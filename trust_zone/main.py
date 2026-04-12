@@ -17,11 +17,11 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 # 3. Configuración de archivos
-formatted_db_path = "C:\\Users\\jiaha\\Documents\\Universidad\\BDA\\BCN-Meteorologics\\formatted_zone.duckdb"
-trusted_db_path = "C:\\Users\\jiaha\\Documents\\Universidad\\BDA\\BCN-Meteorologics\\trust_zone\\trusted_zone.duckdb"
+formatted_db_path = "C:\\Users\\jiaha\\Documents\\Universidad\\BDA\\BCN-Meteorologics\\formatted_zone.db"
+trusted_db_path = "C:\\Users\\jiaha\\Documents\\Universidad\\BDA\\BCN-Meteorologics\\trust_zone\\trusted_zone.db"
 
 tablas = duckdb.connect(formatted_db_path).execute("SHOW TABLES").fetchall()
-print("Tablas en formatted_zone.duckdb:")
+print("Tablas en formatted_zone.db:")
 for tabla in tablas:
     print(tabla[0])
 ################################# ANALYSIS FOR FORMATTED ZONE ######################################
@@ -38,14 +38,10 @@ from pyspark.sql import SparkSession, functions as F
 def read_duckdb(table_name, path):
     formatted_path = path.replace("\\", "/")
     
-    # Envolvemos el nombre de la tabla en comillas dobles 
-    # para que DuckDB no se queje por el número "2025" al inicio.
-    quoted_table_name = f'"{table_name}"'
-    
     return spark.read \
         .format("jdbc") \
         .option("url", f"jdbc:duckdb:{formatted_path}") \
-        .option("dbtable", quoted_table_name) \
+        .option("dbtable", table_name) \
         .option("driver", "org.duckdb.DuckDBDriver") \
         .load()
 def accident_denial_constraint(df_accidents, df_persones):
@@ -127,9 +123,9 @@ def save_to_trusted(df, table_name, db_path):
         .save()
 ####################### EJECUCIÓN DEL FLUJO PRINCIPAL #######################
 # 1. Carga (Formatted Zone)
-df_acc_raw = read_duckdb("t_2025_ACCIDENTS_GU_BCN", formatted_db_path)
-df_per_raw = read_duckdb("t_2025_ACCIDENTS_PERSONES_GU_BCN", formatted_db_path)
-df_met_raw = read_duckdb("t_2025_METEOCAT_DETALL_ESTACIONS", formatted_db_path)
+df_acc_raw = read_duckdb("t2025_ACCIDENTS_GU_BCN", formatted_db_path)
+df_per_raw = read_duckdb("t2025_ACCIDENTS_PERSONES_GU_BCN", formatted_db_path)
+df_met_raw = read_duckdb("t2025_METEOCAT_DETALL_ESTACIONS", formatted_db_path)
 
 # 2. Procesamiento (Aplicando tus funciones de Denial Constraints)
 # Asumiendo que accident_denial_constraints devuelve (acc_v, per_v, acc_q, per_q)

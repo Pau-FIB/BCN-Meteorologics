@@ -22,9 +22,9 @@ DRIVER   = "org.duckdb.DuckDBDriver"
 # ── Procesamiento de archivos ──────────────────────────────────────────────
 
 archivos = [
-    "./bcn_meteo_csv/2025_accidents_gu_bcn.csv",
-    "./bcn_meteo_csv/2025_accidents_persones_gu_bcn.csv",
-    "./bcn_meteo_csv/2025_MeteoCat_Detall_Estacions.csv"
+    "../bcn_meteo_csv/2025_accidents_gu_bcn.csv",
+    "../bcn_meteo_csv/2025_accidents_persones_gu_bcn.csv",
+    "../bcn_meteo_csv/2025_MeteoCat_Detall_Estacions.csv"
 ]
 
 for ruta in archivos:

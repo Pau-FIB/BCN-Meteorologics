@@ -119,7 +119,7 @@ def analyze_formatted_zone(db_path: str = "formatted_zone.duckdb") -> dict:
             table_analysis['numeric_stats'] = numeric_stats
             
             # 5. VALORES ÚNICOS (SOLO PARA COLUMNAS CON POCOS VALORES)
-            print(f"\n🔹 Valores Únicos (Columnas con < 50 valores distintos):")
+            print(f"\n🔹 Valores Únicos:")
             unique_stats = {}
             distinct_found = False
             
@@ -127,18 +127,13 @@ def analyze_formatted_zone(db_path: str = "formatted_zone.duckdb") -> dict:
                 distinct_count = con.execute(f"SELECT COUNT(DISTINCT \"{col_name}\") FROM \"{table_name}\"").fetchone()[0]
                 unique_stats[col_name] = distinct_count
                 
-                if distinct_count < 50:
-                    distinct_found = True
-                    print(f"   ├─ {col_name:<30} {distinct_count} valores distintos")
-                    
-                    # Mostrar los valores si hay pocos
-                    if distinct_count <= 10:
-                        values = con.execute(f"SELECT DISTINCT \"{col_name}\" FROM \"{table_name}\" ORDER BY 1").fetchall()
-                        print(f"   │  └─ Valores: {', '.join(str(v[0]) for v in values)}")
-            
-            if not distinct_found:
-                print(f"   └─ Todas las columnas tienen > 50 valores distintos")
-            
+                print(f"   ├─ {col_name:<30} {distinct_count} valores distintos")
+                
+                # Mostrar los valores si hay pocos
+                if distinct_count <= 10:
+                    values = con.execute(f"SELECT DISTINCT \"{col_name}\" FROM \"{table_name}\" ORDER BY 1").fetchall()
+                    print(f"   │  └─ Valores: {', '.join(str(v[0]) for v in values)}")
+        
             table_analysis['unique_stats'] = unique_stats
             
             # 6. VISTA PREVIA DE DATOS

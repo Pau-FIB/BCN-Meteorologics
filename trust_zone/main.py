@@ -17,7 +17,7 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 # 3. Configuración de archivos
-formatted_db_path = "C:\\Users\\jiaha\\Documents\\Universidad\\BDA\\BCN-Meteorologics\\formatted_zone.db"
+formatted_db_path = "C:\\Users\\jiaha\\Documents\\Universidad\\BDA\\BCN-Meteorologics\\Formatter_zone\\formatted_zone.db" 
 trusted_db_path = "C:\\Users\\jiaha\\Documents\\Universidad\\BDA\\BCN-Meteorologics\\trust_zone\\trusted_zone.db"
 
 tablas = duckdb.connect(formatted_db_path).execute("SHOW TABLES").fetchall()
@@ -38,12 +38,17 @@ from pyspark.sql import SparkSession, functions as F
 def read_duckdb(table_name, path):
     formatted_path = path.replace("\\", "/")
     
+    # Envolvemos el nombre de la tabla en comillas dobles 
+    # para que DuckDB no se queje por el número "2025" al inicio.
+    quoted_table_name = f'"{table_name}"'
+    
     return spark.read \
         .format("jdbc") \
         .option("url", f"jdbc:duckdb:{formatted_path}") \
-        .option("dbtable", table_name) \
+        .option("dbtable", quoted_table_name) \
         .option("driver", "org.duckdb.DuckDBDriver") \
         .load()
+
 def accident_denial_constraint(df_accidents, df_persones):
     # Rule 1: Duplicados
     df_accidents = df_accidents.dropDuplicates()
@@ -121,13 +126,33 @@ def save_to_trusted(df, table_name, db_path):
         .option("dbtable", f'"{table_name}"') \
         .mode("overwrite") \
         .save()
+def clean_column(col):
+    # Limpia los nombres de las columnas (acentos, espacios, etc)
+    col = col.replace('\ufeff', '')
+    col = col.replace('"', '')
+    col = col.strip().lower().replace(" ", "_")
+    col = ''.join(
+        c for c in unicodedata.normalize('NFD', col)
+        if unicodedata.category(c) != 'Mn'
+    ) # Elimina acentos
+    return col
 ####################### EJECUCIÓN DEL FLUJO PRINCIPAL #######################
 # 1. Carga (Formatted Zone)
-df_acc_raw = read_duckdb("t2025_ACCIDENTS_GU_BCN", formatted_db_path)
-df_per_raw = read_duckdb("t2025_ACCIDENTS_PERSONES_GU_BCN", formatted_db_path)
-df_met_raw = read_duckdb("t2025_METEOCAT_DETALL_ESTACIONS", formatted_db_path)
 
-# 2. Procesamiento (Aplicando tus funciones de Denial Constraints)
+df_acc_raw = read_duckdb("2025_ACCIDENTS_GU_BCN", formatted_db_path)
+df_per_raw = read_duckdb("2025_ACCIDENTS_PERSONES_GU_BCN", formatted_db_path)
+df_met_raw = read_duckdb("2025_METEOCAT_DETALL_ESTACIONS", formatted_db_path)
+
+# Procesamiento
+unicodedata = __import__("unicodedata") # Importamos unicodedata para limpiar nombres de columnas
+for col in df_acc_raw.columns:
+    df_acc_raw = df_acc_raw.withColumnRenamed(col, clean_column(col))
+for col in df_per_raw.columns:
+    df_per_raw = df_per_raw.withColumnRenamed(col, clean_column(col))
+for col in df_met_raw.columns:
+    df_met_raw = df_met_raw.withColumnRenamed(col, clean_column(col))
+#Transformaciones
+# 2. Transformaciones (Aplicando tus funciones de Denial Constraints)
 # Asumiendo que accident_denial_constraints devuelve (acc_v, per_v, acc_q, per_q)
 accidents_valid, persones_valid = accident_denial_constraint(df_acc_raw, df_per_raw)
 meteo_valid = meteo_denial_constraint(df_met_raw)
